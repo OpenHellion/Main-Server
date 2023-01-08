@@ -15,9 +15,7 @@ const signInRequest: ValidateFunction = ajv.compile({
 		PlayerId: { type: "string" },
 		Version: { type: "string" },
 		Hash: { type: "integer" },
-		JoiningId: { type: "integer" },
-		SteamId: { type: "string" },
-		DiscordId: { type: "string" }
+		JoiningId: { type: "integer" }
 	},
 	required: ["PlayerId", "Version", "Hash"],
 	additionalProperties: false
@@ -76,16 +74,15 @@ enum Region {
 	America = 8
 }
 
-var activeUsers:number[] = []
-
 app.use(express.json())
 
 app.use('/api', function(req, res, next) {
+	console.log(req.body)
 	next();
 });
 
 // Main function for the api. Sign in, and return a server to connect to.
-app.post('/api/signin', (req: Request, res: Response) => {
+app.get('/api/signin', (req: Request, res: Response) => {
 	var valid = signInRequest(req.body)
 	if (valid) {
 		if (!validator.isUUID(req.body.PlayerId)) {
@@ -95,19 +92,11 @@ app.post('/api/signin', (req: Request, res: Response) => {
 			return
 		}
 
-		if (activeUsers.includes(req.body.PlayerId)) {
-			res.send({
-				"Result": ResponseResult.AlreadyLoggedInError
-			})
-			return
-		}
-
 		// TODO: Validate version, and hash.
 
 		// Responds with a server to connect to.
 		db.getUser(req.body.PlayerId, (user: any) => {
 			if (user) {
-				activeUsers.push(req.body.PlayerId)
 
 				// TODO: Select nearest server.
 				db.getServer((server: any) => {
@@ -143,7 +132,7 @@ app.post('/api/signin', (req: Request, res: Response) => {
 })
 
 // Request to create a new user.
-app.post("/api/createPlayer", (req: Request, res: Response) => {
+app.get("/api/createPlayer", (req: Request, res: Response) => {
 	var valid = createUserRequest(req.body)
 	if (valid) {
 
@@ -168,7 +157,7 @@ app.post("/api/createPlayer", (req: Request, res: Response) => {
 })
 
 // Request to create a new user.
-app.post("/api/getPlayerId", (req: Request, res: Response) => {
+app.get("/api/getPlayerId", (req: Request, res: Response) => {
 	var valid = getPlayerId(req.body)
 	if (valid) {
 
@@ -193,7 +182,7 @@ app.post("/api/getPlayerId", (req: Request, res: Response) => {
 })
 
 // Request to add a new server to our list of servers.
-app.post("/api/publishServer", (req: Request, res: Response) => {
+app.get("/api/publishServer", (req: Request, res: Response) => {
 	var valid = publishServerRequest(req.body)
 
 	// Check if ip is valid.
