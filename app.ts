@@ -12,38 +12,47 @@ import * as db from "./src/database"
 const signInRequest: ValidateFunction = ajv.compile({
 	type: "object",
 	properties: {
-		playerId: { type: "string" },
-		version: { type: "string" },
-		hash: { type: "integer" },
-		joiningId: { type: "integer" },
-		steamId: { type: "integer" },
-		discordId: { type: "integer" }
+		PlayerId: { type: "string" },
+		Version: { type: "string" },
+		Hash: { type: "integer" },
+		JoiningId: { type: "integer" },
+		SteamId: { type: "string" },
+		DiscordId: { type: "string" }
 	},
-	required: ["playerId", "version", "hash"],
+	required: ["PlayerId", "Version", "Hash"],
 	additionalProperties: false
 })
 
 const createUserRequest: ValidateFunction = ajv.compile({
 	type: "object",
 	properties: {
-		name: { type: "string" },
-		region: { type: "integer" },
-		steamId: { type: "integer" },
-		discordId: { type: "integer" }
+		Name: { type: "string" },
+		Region: { type: "integer" },
+		SteamId: { type: "string" },
+		DiscordId: { type: "string" }
 	},
-	required: ["name", "region"],
+	required: ["Name", "Region"],
+	additionalProperties: false
+})
+
+const getPlayerId: ValidateFunction = ajv.compile({
+	type: "object",
+	properties: {
+		SteamId: { type: "string" },
+		DiscordId: { type: "string" }
+	},
 	additionalProperties: false
 })
 
 const publishServerRequest: ValidateFunction = ajv.compile({
 	type: "object",
 	properties: {
-		region: { type: "integer" },
-		ipAddress: { type: "string" },
-		port: { type: "integer" },
-		hash: { type: "integer" }
+		Region: { type: "integer" },
+		IpAddress: { type: "string" },
+		Port: { type: "integer" },
+		Hash: { type: "integer" }
 	},
-	required: ["region", "ipAddress", "port", "hash"],
+	required: ["Region", "IpAddress", "Port", "Hash"],
 	additionalProperties: false
 })
 
@@ -79,16 +88,16 @@ app.use('/api', function(req, res, next) {
 app.post('/api/signin', (req: Request, res: Response) => {
 	var valid = signInRequest(req.body)
 	if (valid) {
-		if (!validator.isUUID(req.body.playerId)) {
+		if (!validator.isUUID(req.body.PlayerId)) {
 			res.send({
-				"result": ResponseResult.RequestInvalid
+				"Result": ResponseResult.RequestInvalid
 			})
 			return
 		}
 
-		if (activeUsers.includes(req.body.playerId)) {
+		if (activeUsers.includes(req.body.PlayerId)) {
 			res.send({
-				"result": ResponseResult.AlreadyLoggedInError
+				"Result": ResponseResult.AlreadyLoggedInError
 			})
 			return
 		}
@@ -96,65 +105,89 @@ app.post('/api/signin', (req: Request, res: Response) => {
 		// TODO: Validate version, and hash.
 
 		// Responds with a server to connect to.
-		db.getUser(req.body.playerId, (user: any) => {
+		db.getUser(req.body.PlayerId, (user: any) => {
 			if (user) {
-				activeUsers.push(req.body.playerId)
+				activeUsers.push(req.body.PlayerId)
 
 				// TODO: Select nearest server.
 				db.getServer((server: any) => {
 					if (server) {
 						res.send({
-							"result": ResponseResult.Success,
-							"server": {
-								"id": server.id,
-								"ipAddress": server.ip_address,
-								"port": server.port,
-								"hash": server.hash,
-								"region": server.region
+							"Result": ResponseResult.Success,
+							"Server": {
+								"Id": server.id,
+								"IpAddress": server.ip_address,
+								"Port": server.port,
+								"Hash": server.hash,
+								"Region": server.region
 							},
-							"lastSignIn": user.last_signin
+							"LastSignIn": user.last_signin
 						})
 					} else {
 						res.send({
-							"result": ResponseResult.ServerNotFound
+							"Result": ResponseResult.ServerNotFound
 						})
 					}
 				})
 			} else {
 				res.send({
-					"result": ResponseResult.UserNotFound
+					"Result": ResponseResult.UserNotFound
 				})
 			}
 		})
 	} else {
 		res.send({
-			"result": ResponseResult.RequestInvalid,
-			"error": signInRequest.errors
+			"Result": ResponseResult.RequestInvalid
 		})
 	}
 })
 
 // Request to create a new user.
-app.post("/api/createUser", (req: Request, res: Response) => {
+app.post("/api/createPlayer", (req: Request, res: Response) => {
 	var valid = createUserRequest(req.body)
 	if (valid) {
 
 		// Add user to database and send back the new id.
-		db.createUser(req.body.name, req.body.region, req.body.steamId, req.body.discordId, (playerId: string) => {
+		db.createUser(req.body.Name, req.body.Region, req.body.SteamId, req.body.DiscordId, (playerId: string) => {
 			if (playerId) {
 				res.send({
-					"result": ResponseResult.Success,
-					"playerId": playerId
+					"Result": ResponseResult.Success,
+					"PlayerId": playerId
 				})
 			} else {
 				res.send({
-					"result": ResponseResult.UserAlreadyExists
+					"Result": ResponseResult.UserAlreadyExists
 				});
 			}
 		})
 	} else {
 		res.send({
-			"result": ResponseResult.RequestInvalid
+			"Result": ResponseResult.RequestInvalid
+		})
+	}
+})
+
+// Request to create a new user.
+app.post("/api/getPlayerId", (req: Request, res: Response) => {
+	var valid = getPlayerId(req.body)
+	if (valid) {
+
+		// Try to find user with either discord or steam id and send back the new id.
+		db.getPlayerByNativeIds(req.body.SteamId, req.body.DiscordId, (playerId: string) => {
+			if (playerId) {
+				res.send({
+					"Result": ResponseResult.Success,
+					"PlayerId": playerId
+				})
+			} else {
+				res.send({
+					"Result": ResponseResult.UserNotFound
+				});
+			}
+		})
+	} else {
+		res.send({
+			"Result": ResponseResult.RequestInvalid
 		})
 	}
 })
@@ -164,7 +197,7 @@ app.post("/api/publishServer", (req: Request, res: Response) => {
 	var valid = publishServerRequest(req.body)
 
 	// Check if ip is valid.
-	if (valid && !validator.isIP(req.body.ipAddress)) {
+	if (valid && !validator.isIP(req.body.IpAddress)) {
 		valid = false
 	}
 
@@ -176,21 +209,21 @@ app.post("/api/publishServer", (req: Request, res: Response) => {
 		// TODO: Check hash.
 
 		// Add server to database and send back the new server id.
-		db.createServer(req.body.ipAddress, req.body.port, req.body.region, req.body.hash, (serverId: string) => {
+		db.createServer(req.body.IpAddress, req.body.Port, req.body.Region, req.body.Hash, (serverId: string) => {
 			if (serverId) {
 				res.send({
-					"result": ResponseResult.Success,
-					"serverId": serverId
+					"Result": ResponseResult.Success,
+					"ServerId": serverId
 				})
 			} else {
 				res.send({
-					"result": ResponseResult.UserAlreadyExists
+					"Result": ResponseResult.UserAlreadyExists
 				});
 			}
 		})
 	} else {
 		res.send({
-			"result": ResponseResult.RequestInvalid
+			"Result": ResponseResult.RequestInvalid
 		})
 	}
 })
