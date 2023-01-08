@@ -50,11 +50,11 @@ function createUser(name: string, region: number, steamId: number, discordId: nu
 		}
 
 		// Generate an id we will use for the user indefinitely.
-		var userId: string = randomUUID()
+		var playerId: string = randomUUID()
 	
 		// Add user to database.
-		db.run("INSERT INTO users (id, name, steam_id, discord_id) VALUES ($userId, $name, $steamId, $discordId)", {
-			$userId: userId,
+		db.run("INSERT INTO users (id, name, steam_id, discord_id) VALUES ($playerId, $name, $steamId, $discordId)", {
+			$playerId: playerId,
 			$name: name,
 			$steamId: steamId,
 			$discordId: discordId },(err: any) => {
@@ -63,7 +63,7 @@ function createUser(name: string, region: number, steamId: number, discordId: nu
 				return
 			}
 	
-			callback(userId)
+			callback(playerId)
 		})
 	})
 }

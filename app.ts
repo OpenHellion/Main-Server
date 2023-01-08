@@ -12,14 +12,14 @@ import * as db from "./src/database"
 const signInRequest: ValidateFunction = ajv.compile({
 	type: "object",
 	properties: {
-		userId: { type: "string" },
+		playerId: { type: "string" },
 		version: { type: "string" },
 		hash: { type: "integer" },
 		joiningId: { type: "integer" },
 		steamId: { type: "integer" },
 		discordId: { type: "integer" }
 	},
-	required: ["userId", "version", "hash"],
+	required: ["playerId", "version", "hash"],
 	additionalProperties: false
 })
 
@@ -76,17 +76,17 @@ app.use('/api', function(req, res, next) {
 });
 
 // Main function for the api. Sign in, and return a server to connect to.
-app.get('/api/signin', (req: Request, res: Response) => {
+app.post('/api/signin', (req: Request, res: Response) => {
 	var valid = signInRequest(req.body)
 	if (valid) {
-		if (!validator.isUUID(req.body.userId)) {
+		if (!validator.isUUID(req.body.playerId)) {
 			res.send({
 				"result": ResponseResult.RequestInvalid
 			})
 			return
 		}
 
-		if (activeUsers.includes(req.body.userId)) {
+		if (activeUsers.includes(req.body.playerId)) {
 			res.send({
 				"result": ResponseResult.AlreadyLoggedInError
 			})
@@ -96,9 +96,9 @@ app.get('/api/signin', (req: Request, res: Response) => {
 		// TODO: Validate version, and hash.
 
 		// Responds with a server to connect to.
-		db.getUser(req.body.userId, (user: any) => {
+		db.getUser(req.body.playerId, (user: any) => {
 			if (user) {
-				activeUsers.push(req.body.userId)
+				activeUsers.push(req.body.playerId)
 
 				// TODO: Select nearest server.
 				db.getServer((server: any) => {
@@ -140,11 +140,11 @@ app.post("/api/createUser", (req: Request, res: Response) => {
 	if (valid) {
 
 		// Add user to database and send back the new id.
-		db.createUser(req.body.name, req.body.region, req.body.steamId, req.body.discordId, (userId: string) => {
-			if (userId) {
+		db.createUser(req.body.name, req.body.region, req.body.steamId, req.body.discordId, (playerId: string) => {
+			if (playerId) {
 				res.send({
 					"result": ResponseResult.Success,
-					"userId": userId
+					"playerId": playerId
 				})
 			} else {
 				res.send({
