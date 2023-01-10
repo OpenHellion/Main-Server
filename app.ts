@@ -5,9 +5,11 @@ const ajv = new Ajv()
 
 import express, { Express, Request, Response } from "express"
 const app: Express = express()
-const port: number = 6000
+const port: number = 6001
 
 import * as db from "./src/database"
+
+import { isIPv4 } from "net"
 
 const signInRequest: ValidateFunction = ajv.compile({
 	type: "object",
@@ -46,11 +48,11 @@ const publishServerRequest: ValidateFunction = ajv.compile({
 	type: "object",
 	properties: {
 		Region: { type: "integer" },
-		IpAddress: { type: "string" },
-		Port: { type: "integer" },
+		GamePort: { type: "integer" },
+		StatusPort: { type: "integer" },
 		Hash: { type: "integer" }
 	},
-	required: ["Region", "IpAddress", "Port", "Hash"],
+	required: ["Region", "GamePort", "Hash"],
 	additionalProperties: false
 })
 
@@ -74,6 +76,7 @@ enum Region {
 	America = 8
 }
 
+app.enable('trust proxy')
 app.use(express.json())
 
 app.use('/api', function(req, res, next) {
@@ -186,7 +189,7 @@ app.get("/api/publishServer", (req: Request, res: Response) => {
 	var valid = publishServerRequest(req.body)
 
 	// Check if ip is valid.
-	if (valid && !validator.isIP(req.body.IpAddress)) {
+	if (!validator.isIP(req.ip)) {
 		valid = false
 	}
 
@@ -198,7 +201,7 @@ app.get("/api/publishServer", (req: Request, res: Response) => {
 		// TODO: Check hash.
 
 		// Add server to database and send back the new server id.
-		db.createServer(req.body.IpAddress, req.body.Port, req.body.Region, req.body.Hash, (serverId: string) => {
+		db.createServer(req.ip, req.body.Port, req.body.Region, req.body.Hash, (serverId: string) => {
 			if (serverId) {
 				res.send({
 					"Result": ResponseResult.Success,
