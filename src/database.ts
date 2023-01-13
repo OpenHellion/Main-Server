@@ -5,11 +5,11 @@ sqlite3.verbose()
 const db = new sqlite3.Database(":memory:", (err) => {
 	if (err == null) {
 		db.run("CREATE TABLE users (id TEXT, name TEXT, steam_id TEXT, discord_id TEXT, region INT, last_signin TEXT, last_server_id INT)")
-		db.run("CREATE TABLE servers (id TEXT, ip_address TEXT, port INT, hash INT, region INT)")
+		db.run("CREATE TABLE servers (id TEXT, ip_address TEXT, game_port INT, status_port INT, hash INT, region INT)")
 	}
 })
 
-function getUser(id: number, callback: Function) {
+function getUser(id: string, callback: Function) {
 	db.get("SELECT * FROM users WHERE id = $id", { $id: id }, (err, row) => {
 		if (err) {
 			console.log("Error:", err.message)
@@ -20,8 +20,19 @@ function getUser(id: number, callback: Function) {
 	})
 }
 
-function getServer(callback: Function) {
+function getRandomServer(callback: Function) {
 	db.get("SELECT * FROM servers", (err, row) => {
+		if (err) {
+			console.log("Error:", err.message)
+			callback(null)
+			return
+		}
+		callback(row)
+	})
+}
+
+function getServer(id: string, callback: Function) {
+	db.get("SELECT * FROM servers WHERE id = $id", { $id: id }, (err, row) => {
 		if (err) {
 			console.log("Error:", err.message)
 			callback(null)
@@ -72,7 +83,7 @@ function createUser(name: string, region: number, steamId: string, discordId: st
 
 function getPlayerByNativeIds(steamId: string, discordId: string, callback: Function) {
 	// Check if server already exists.
-	db.get("SELECT * FROM servers WHERE ip_address = $steamId OR port = $discordId", {
+	db.get("SELECT * FROM users WHERE steam_id = $steamId OR discord_id = $discordId", {
 		$steamId: steamId,
 		$discordId: discordId }, (err: any, row: any) => {
 
@@ -91,11 +102,11 @@ function getPlayerByNativeIds(steamId: string, discordId: string, callback: Func
 	})
 }
 
-function createServer(ipAddress: string, port: number, region: number, hash: number, callback: Function) {
+function createServer(ipAddress: string, gamePort: number, statusPort: number, region: number, hash: number, callback: Function) {
 	// Check if server already exists.
-	db.get("SELECT * FROM servers WHERE ip_address = $ipAddress AND port = $port", {
+	db.get("SELECT * FROM servers WHERE ip_address = $ipAddress AND game_port = $gamePort", {
 		$ipAddress: ipAddress,
-		$port: port }, (err: any, row: any) => {
+		$gamePort: gamePort }, (err: any, row: any) => {
 
 		if (err) {
 			console.log("Error:", err.stack)
@@ -104,7 +115,7 @@ function createServer(ipAddress: string, port: number, region: number, hash: num
 		}
 
 		if (row) {
-			console.log("Server with ip already exists:", ipAddress + ":" + port)
+			console.log("Server with ip already exists:", ipAddress + ":" + gamePort)
 			callback(null)
 			return
 		}
@@ -113,10 +124,11 @@ function createServer(ipAddress: string, port: number, region: number, hash: num
 		var serverId: string = randomUUID()
 	
 		// Add user to database.
-		db.run("INSERT INTO servers (id, ip_address, port, hash, region) VALUES ($serverId, $ipAddress, $port, $hash, $region)", {
+		db.run("INSERT INTO servers (id, ip_address, game_port, status_port, hash, region) VALUES ($serverId, $ipAddress, $gamePort, $statusPort, $hash, $region)", {
 			$serverId: serverId,
 			$ipAddress: ipAddress,
-			$port: port,
+			$gamePort: gamePort,
+			$statusPort: statusPort,
 			$hash: hash,
 			$region: region
 		},(err: any) => {
@@ -136,6 +148,7 @@ function close() {
 
 export {
 	getUser,
+	getRandomServer,
 	getServer,
 	getPlayerByNativeIds,
 	createUser,

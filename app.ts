@@ -9,8 +9,6 @@ const port: number = 6001
 
 import * as db from "./src/database"
 
-import { isIPv4 } from "net"
-
 const signInRequest: ValidateFunction = ajv.compile({
 	type: "object",
 	properties: {
@@ -76,7 +74,6 @@ enum Region {
 	America = 8
 }
 
-app.enable('trust proxy')
 app.use(express.json())
 
 app.use('/api', function(req, res, next) {
@@ -102,14 +99,15 @@ app.get('/api/signin', (req: Request, res: Response) => {
 			if (user) {
 
 				// TODO: Select nearest server.
-				db.getServer((server: any) => {
+				db.getRandomServer((server: any) => {
 					if (server) {
 						res.send({
 							"Result": ResponseResult.Success,
 							"Server": {
 								"Id": server.id,
 								"IpAddress": server.ip_address,
-								"Port": server.port,
+								"GamePort": server.game_port,
+								"StatusPort": server.status_port,
 								"Hash": server.hash,
 								"Region": server.region
 							},
@@ -185,12 +183,19 @@ app.get("/api/getPlayerId", (req: Request, res: Response) => {
 })
 
 // Request to add a new server to our list of servers.
-app.get("/api/publishServer", (req: Request, res: Response) => {
+app.get("/api/checkIn", (req: Request, res: Response) => {
 	var valid = publishServerRequest(req.body)
 
+	var ip:string = req.ip
+
 	// Check if ip is valid.
-	if (!validator.isIP(req.ip)) {
+	if (!validator.isIP(ip)) {
 		valid = false
+	}
+
+	if (ip === "::1")
+	{
+		ip = "localhost"
 	}
 
 	// TODO: Add quality checks.
@@ -200,19 +205,37 @@ app.get("/api/publishServer", (req: Request, res: Response) => {
 
 		// TODO: Check hash.
 
-		// Add server to database and send back the new server id.
-		db.createServer(req.ip, req.body.Port, req.body.Region, req.body.Hash, (serverId: string) => {
-			if (serverId) {
-				res.send({
-					"Result": ResponseResult.Success,
-					"ServerId": serverId
-				})
-			} else {
-				res.send({
-					"Result": ResponseResult.UserAlreadyExists
-				});
-			}
-		})
+		if (req.body.ServerId)
+		{
+			// Server already exists, so just get that.
+			db.getServer(req.body.ServerId, (server: any) => {
+				if (server) {
+					res.send({
+						"Result": ResponseResult.Success,
+						"ServerId": server.id
+					})
+				} else {
+					res.send({
+						"Result": ResponseResult.ServerNotFound
+					});
+				}
+			})
+		} else {
+			
+			// Server doesn't exist so we need to add it to the database.
+			db.createServer(ip, req.body.GamePort, req.body.StatusPort, req.body.Region, req.body.Hash, (serverId: string) => {
+				if (serverId) {
+					res.send({
+						"Result": ResponseResult.Success,
+						"ServerId": serverId
+					})
+				} else {
+					res.send({
+						"Result": ResponseResult.UserAlreadyExists
+					});
+				}
+			})
+		}
 	} else {
 		res.send({
 			"Result": ResponseResult.RequestInvalid
