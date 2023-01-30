@@ -42,7 +42,7 @@ function getServer(id: string, callback: Function) {
 	})
 }
 
-function createUser(name: string, region: number, steamId: string, discordId: string, callback: Function) {
+function createUser(name: string, region: number, playerId: string, steamId: string, discordId: string, callback: Function) {
 	// Check if user already exists.
 	db.get("SELECT * FROM users WHERE steam_id = $steamId OR discord_id = $discordId", {
 		$steamId: steamId,
@@ -59,9 +59,6 @@ function createUser(name: string, region: number, steamId: string, discordId: st
 			callback(null)
 			return
 		}
-
-		// Generate an id we will use for the user indefinitely.
-		var playerId: string = randomUUID()
 	
 		// TODO: Add last sign in.
 		// Add user to database.

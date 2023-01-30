@@ -26,10 +26,11 @@ const createUserRequest: ValidateFunction = ajv.compile({
 	properties: {
 		Name: { type: "string" },
 		Region: { type: "integer" },
+		PlayerId: { type: "string" },
 		SteamId: { type: "string" },
 		DiscordId: { type: "string" }
 	},
-	required: ["Name", "Region"],
+	required: ["Name", "Region", "PlayerId"],
 	additionalProperties: false
 })
 
@@ -84,14 +85,10 @@ app.use('/api', function(req, res, next) {
 // Main function for the api. Sign in, and return a server to connect to.
 app.get('/api/signin', (req: Request, res: Response) => {
 	var valid = signInRequest(req.body)
-	if (valid) {
-		if (!validator.isUUID(req.body.PlayerId)) {
-			res.send({
-				"Result": ResponseResult.RequestInvalid
-			})
-			return
-		}
 
+	if (!validator.isUUID(req.body.PlayerId)) valid = false
+
+	if (valid) {
 		// TODO: Validate version, and hash.
 
 		// Responds with a server to connect to.
@@ -135,10 +132,13 @@ app.get('/api/signin', (req: Request, res: Response) => {
 // Request to create a new user.
 app.get("/api/createPlayer", (req: Request, res: Response) => {
 	var valid = createUserRequest(req.body)
+
+	if (!validator.isUUID(req.body.PlayerId)) valid = false
+
 	if (valid) {
 
 		// Add user to database and send back the new id.
-		db.createUser(req.body.Name, req.body.Region, req.body.SteamId, req.body.DiscordId, (playerId: string) => {
+		db.createUser(req.body.Name, req.body.Region, req.body.PlayerId, req.body.SteamId, req.body.DiscordId, (playerId: string) => {
 			if (playerId) {
 				res.send({
 					"Result": ResponseResult.Success,
@@ -244,5 +244,5 @@ app.get("/api/checkIn", (req: Request, res: Response) => {
 })
 
 app.listen(port, () => {
-	console.log(`Example app listening on port ${port}`)
+	console.log(`OpenHellion main server listening on port ${port}`)
 })
