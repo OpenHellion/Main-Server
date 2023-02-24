@@ -37,9 +37,13 @@ const createUserRequest: ValidateFunction = ajv.compile({
 const getPlayerId: ValidateFunction = ajv.compile({
 	type: "object",
 	properties: {
-		SteamId: { type: "string" },
-		DiscordId: { type: "string" }
+		Ids: {
+			SteamId: { type: "string" },
+			DiscordId: { type: "string" },
+			type: "array"
+		}
 	},
+	required: ["Ids"],
 	additionalProperties: false
 })
 
@@ -63,8 +67,8 @@ enum ResponseResult {
 	ClientVersionError = 5,
 	ServerNotFound = 6,
 	RequestInvalid = 7,
-	UserNotFound = 8,
-	UserAlreadyExists = 9
+	AccountNotFound = 8,
+	AccountAlreadyExists = 9
 }
 
 enum Region {
@@ -118,7 +122,7 @@ app.get('/api/signin', (req: Request, res: Response) => {
 				})
 			} else {
 				res.send({
-					"Result": ResponseResult.UserNotFound
+					"Result": ResponseResult.AccountNotFound
 				})
 			}
 		})
@@ -146,7 +150,7 @@ app.get("/api/createPlayer", (req: Request, res: Response) => {
 				})
 			} else {
 				res.send({
-					"Result": ResponseResult.UserAlreadyExists
+					"Result": ResponseResult.AccountAlreadyExists
 				});
 			}
 		})
@@ -157,24 +161,35 @@ app.get("/api/createPlayer", (req: Request, res: Response) => {
 	}
 })
 
-// Request to create a new user.
+// Request to get id of users.
 app.get("/api/getPlayerId", (req: Request, res: Response) => {
 	var valid = getPlayerId(req.body)
 	if (valid) {
 
-		// Try to find user with either discord or steam id and send back the new id.
-		db.getPlayerByNativeIds(req.body.SteamId, req.body.DiscordId, (playerId: string) => {
-			if (playerId) {
-				res.send({
-					"Result": ResponseResult.Success,
-					"PlayerId": playerId
-				})
-			} else {
-				res.send({
-					"Result": ResponseResult.UserNotFound
-				});
-			}
-		})
+		// Loop through all the ids we're provided, check an account is registered on it, and when we reach the last one, send it.
+		var playerIds: string[]
+		var result: ResponseResult = ResponseResult.AccountNotFound
+		for (let i = 0; i < req.body.Ids.length; i++) {
+			db.getPlayerByNativeIds(req.body.Ids[i].SteamId, req.body.Ids[i].DiscordId, (playerId: string) => {
+				if (playerId) {
+					playerIds.push(playerId)
+					result = ResponseResult.Success
+				}
+				else
+				{
+					playerIds.push("-1")
+				}
+
+				// If this is the last entry in our ids.
+				if (i + 1 == req.body.Ids.length)
+				{
+					res.send({
+						"Result": result,
+						"PlayerIds": playerIds
+					})
+				}
+			})
+		}
 	} else {
 		res.send({
 			"Result": ResponseResult.RequestInvalid
@@ -231,7 +246,7 @@ app.get("/api/checkIn", (req: Request, res: Response) => {
 					})
 				} else {
 					res.send({
-						"Result": ResponseResult.UserAlreadyExists
+						"Result": ResponseResult.AccountAlreadyExists
 					});
 				}
 			})
